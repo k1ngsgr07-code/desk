@@ -24,7 +24,9 @@
     "grammy": "^1.46.0",
     "jsonwebtoken": "^9.0.3",
     "jsqr": "^1.4.0",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "qrcode": "^1.5.4",
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
@@ -34,9 +36,6 @@
     "@types/pngjs": "^6.0.5",
     "@types/qrcode": "^1.5.6",
     "embedded-postgres": "^18.7.0-beta.19",
-    "pngjs": "^7.0.0",
-    "qrcode": "^1.5.4",
-    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
 }
