@@ -392,7 +392,11 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 async function main() {
   await migrate();
-  await seedMain();
+  try {
+    await seedMain();
+  } catch (e: any) {
+    console.warn('Seed skipped (non-fatal):', e.message);
+  }
   await pool.query('SELECT 1 FROM orders LIMIT 1').catch(() => {
     console.error('Database is not ready. Start Postgres, then run: npm run migrate && npm run seed');
     process.exit(1);
@@ -419,4 +423,7 @@ async function main() {
   });
 }
 
-main();
+main().catch((e) => {
+  console.error('Fatal startup error:', e);
+  process.exit(1);
+});
