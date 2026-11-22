@@ -1,0 +1,31 @@
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.5 system-ui, -apple-system, sans-serif; background: #f4f5f7; color: #1c1e21; }
+.banner { position: sticky; top: 0; z-index: 10; background: #c8102e; color: #fff; text-align: center;
+  font-weight: 800; letter-spacing: 1px; padding: 10px; font-size: 16px; }
+main { max-width: 900px; margin: 0 auto; padding: 16px; }
+main.wide { max-width: 1200px; }
+h1 { font-size: 22px; margin: 12px 0; }
+h2 { font-size: 17px; margin: 0 0 10px; }
+.card { background: #fff; border: 1px solid #dde0e4; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.big { font-size: 30px; font-weight: 700; }
+.muted { color: #667; font-size: 13px; }
+input, button, textarea { font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid #b9bec6; }
+textarea { width: 100%; }
+button { background: #1c1e21; color: #fff; border: 0; cursor: pointer; }
+button.alt { background: #e6e8eb; color: #1c1e21; }
+button.small { padding: 3px 8px; font-size: 13px; }
+button:disabled { opacity: .5; cursor: default; }
+.err { color: #c8102e; min-height: 1.4em; }
+.ok { color: #0a7a3d; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eceef1; white-space: nowrap; }
+.pill { padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; background: #e6e8eb; }
+.pill.paid { background: #d3f3df; color: #0a7a3d; }
+.pill.pending, .pill.approved { background: #fff1c9; color: #7a5a00; }
+.pill.declined, .pill.expired { background: #fde0e3; color: #a10d25; }
+.hidden { display: none !important; }
+video { width: 100%; max-width: 320px; border-radius: 8px; background: #000; }
+.quote { background: #f4f5f7; border-radius: 8px; padding: 12px; margin-top: 10px; }
+a { color: #0b57d0; }

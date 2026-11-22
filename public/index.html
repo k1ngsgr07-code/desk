@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Desk - TEST BUILD</title>
+  <meta name="theme-color" content="#c8102e">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Desk TEST">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="banner">TEST BUILD - NO REAL MONEY</div>
+
+<main>
+  <!-- Logged out -->
+  <section id="authView" class="hidden">
+    <div class="brand">
+      <div class="logo">USDT → INR Desk</div>
+      <div class="muted">Private prototype. Fake funds only.</div>
+    </div>
+    <form id="authForm" class="stack">
+      <input id="email" class="field" type="email" inputmode="email" placeholder="Email" autocomplete="username" autocapitalize="none" required>
+      <input id="password" class="field" type="password" placeholder="Password (8+ characters)" autocomplete="current-password" required>
+      <div id="authErr" class="err"></div>
+      <button class="btn" type="submit">Log in</button>
+      <button class="btn ghost" type="button" id="signupBtn">Create account</button>
+    </form>
+  </section>
+
+  <!-- Logged in -->
+  <section id="appView" class="hidden">
+    <div class="top">
+      <div class="who" id="who"></div>
+      <div>
+        <a class="link hidden" id="adminLink" href="/admin.html">Admin</a>
+        <button class="link" id="logoutBtn">Log out</button>
+      </div>
+    </div>
+
+    <div class="wallet">
+      <div class="label">USDT balance (fake)</div>
+      <div class="amount"><span id="balance">0.00</span> <small>USDT</small></div>
+      <div class="meta">
+        <span>On hold <b id="onHold">0.00</b></span>
+        <span>1 USDT = <b>₹<span id="rate">-</span></b></span>
+      </div>
+      <button class="btn ghost small" id="depositBtn">+ Add 100 test USDT</button>
+    </div>
+
+    <button class="btn hero" id="scanBtn">Scan UPI QR to pay</button>
+    <div class="three">
+      <button class="btn ghost small" id="uploadBtn">Upload QR</button>
+      <button class="btn ghost small" id="sampleBtn">Test QR</button>
+      <button class="btn ghost small" id="pasteBtn">Paste</button>
+    </div>
+
+    <h2>Orders</h2>
+    <div id="orders"></div>
+    <div id="noOrders" class="muted">No orders yet. Scan a UPI QR to make your first one.</div>
+  </section>
+</main>
+
+<!-- Pay sheet: confirm amount -> locked quote -> confirm -->
+<div id="payScrim" class="scrim hidden">
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="muted">Paying</div>
+    <h3 id="payeeName"></h3>
+    <div class="muted" id="payeeVpa"></div>
+    <label class="amountRow"><span>₹</span>
+      <input id="inr" type="text" inputmode="decimal" placeholder="0" autocomplete="off" enterkeyhint="done">
+    </label>
+    <div id="payErr" class="err"></div>
+    <div id="quoteBox" class="quote hidden">
+      <div class="muted">You pay</div>
+      <div class="pay"><span id="qUsdt"></span> USDT</div>
+      <div class="line"><span>Rate</span><span>₹<span id="qRate"></span> per USDT</span></div>
+      <div class="line"><span>Price locked for</span><span><span id="qLeft"></span>s</span></div>
+    </div>
+    <div class="stack">
+      <button class="btn" id="quoteBtn">Get price</button>
+      <button class="btn hidden" id="confirmBtn">Confirm and pay</button>
+      <button class="btn ghost" id="cancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Paste sheet -->
+<div id="pasteScrim" class="scrim hidden">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>Paste UPI text</h3>
+    <div class="muted" style="margin-bottom: 12px">The text inside a UPI QR, starting with upi://pay</div>
+    <div class="stack">
+      <textarea id="payloadText" class="field" rows="3" placeholder="upi://pay?pa=someone@upi&pn=Name&am=500" autocapitalize="none" autocorrect="off" spellcheck="false"></textarea>
+      <button class="btn" id="pasteUse">Continue</button>
+      <button class="btn ghost" id="pasteCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shown on plain http: the live scanner needs the https address -->
+<div id="secureScrim" class="scrim hidden">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>Turn on live scanning</h3>
+    <div class="muted" style="margin: 6px 0 14px">Phones only allow the in-app camera on a secure (https) address.
+      Open the secure version once. Your phone will warn that the connection is "not private" because this is a
+      test certificate: tap Advanced, then Proceed. Then log in again.</div>
+    <div class="stack">
+      <button class="btn" id="secureGo">Open secure version</button>
+      <button class="btn ghost" id="securePhoto">Take a photo instead</button>
+    </div>
+  </div>
+</div>
+
+<!-- Live camera scanner (only where the browser allows it: https or localhost) -->
+<div id="scanner" class="scanner hidden">
+  <video id="video" playsinline muted></video>
+  <div class="frame"></div>
+  <div class="hint" id="scanHint">Point at a UPI QR code</div>
+  <div class="bar"><button class="btn ghost" id="camStop">Cancel</button></div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<!-- hidden pickers: one opens the phone camera to take a photo, one opens the gallery -->
+<input id="photoInput" class="hidden" type="file" accept="image/*" capture="environment">
+<input id="fileInput" class="hidden" type="file" accept="image/*">
+<canvas id="canvas" class="hidden"></canvas>
+
+<script src="/vendor/jsQR.js"></script>
+<script src="/common.js"></script>
+<script>
+let payload = '';       // raw UPI text from the QR
+let quote = null;       // { token, expiresAt }
+let quoteTimer = null;
+let camStream = null;
+let toastTimer = null;
+
+function toast(text, bad) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.toggle('bad', !!bad);
+  t.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), bad ? 5000 : 3500);
+}
+
+// ---------- auth ----------
+async function doAuth(path) {
+  $('authErr').textContent = '';
+  try {
+    const r = await api(path, { email: $('email').value, password: $('password').value });
+    setToken(r.token);
+    $('password').value = '';
+    refresh();
+  } catch (e) { $('authErr').textContent = e.message; }
+}
+$('authForm').onsubmit = (e) => { e.preventDefault(); doAuth('/login'); };
+$('signupBtn').onclick = () => doAuth('/signup');
+$('logoutBtn').onclick = () => { setToken(''); refresh(); };
+
+// ---------- wallet + orders ----------
+function show(loggedIn) {
+  $('authView').classList.toggle('hidden', loggedIn);
+  $('appView').classList.toggle('hidden', !loggedIn);
+}
+
+async function refresh() {
+  if (!getToken()) return show(false);
+  let me;
+  try { me = await api('/me'); }
+  catch (e) { if (e.status === 401) { setToken(''); show(false); } return; }
+  show(true);
+  $('who').textContent = me.email;
+  $('adminLink').classList.toggle('hidden', !me.is_admin);
+  $('balance').textContent = Number(me.usdt_balance).toFixed(2);
+  $('onHold').textContent = Number(me.usdt_on_hold).toFixed(2);
+  $('rate').textContent = Number(me.rate).toFixed(2);
+  $('noOrders').classList.toggle('hidden', me.orders.length > 0);
+  $('orders').innerHTML = me.orders.map((o) => `<div class="order">
+    <div class="left">
+      <div class="name">${esc(o.payee_name || o.payee_vpa)}</div>
+      <div class="muted">#${o.id} · ${esc(new Date(o.created_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</div>
+    </div>
+    <div class="right">
+      <div class="inr">₹${esc(o.inr_amount)}</div>
+      <div class="muted">${Number(o.usdt_amount).toFixed(2)} USDT</div>
+      ${pill(o.status)}
+    </div></div>`).join('');
+}
+
+$('depositBtn').onclick = async () => {
+  try { await api('/test-deposit', { amount: 100 }); toast('Added 100 test USDT'); refresh(); }
+  catch (e) { toast(e.message, true); }
+};
+
+// ---------- reading the QR ----------
+function decodeFromSource(src, w, h) {
+  const canvas = $('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  // Phone photos are huge; try a few sizes because a small QR in a big photo needs more pixels.
+  for (const max of [1000, 1800, 600]) {
+    const scale = Math.min(1, max / Math.max(w, h));
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+    ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const found = jsQR(img.data, img.width, img.height);
+    if (found && found.data) return found.data;
+    if (scale === 1) break;
+  }
+  return null;
+}
+
+function decodeImageUrl(url) {
+  const img = new Image();
+  img.onload = () => {
+    const text = decodeFromSource(img, img.naturalWidth, img.naturalHeight);
+    if (text) usePayload(text);
+    else toast('No QR code found. Hold the phone steady, fill the frame, and try again.', true);
+  };
+  img.onerror = () => toast('Could not read that image.', true);
+  img.src = url;
+}
+
+for (const id of ['photoInput', 'fileInput']) {
+  $(id).onchange = (e) => {
+    const f = e.target.files[0];
+    e.target.value = ''; // so picking the same photo again still fires
+    if (f) decodeImageUrl(URL.createObjectURL(f));
+  };
+}
+$('uploadBtn').onclick = () => $('fileInput').click();
+$('sampleBtn').onclick = () => decodeImageUrl('/test-qr.png?' + Date.now());
+
+// ---------- live scanner ----------
+// The camera opens inside the app and the QR is read automatically, no button press.
+// Browsers only allow this on https (or localhost). On plain http we offer the secure address.
+let httpsPort = null;
+fetch('/api/info').then((r) => r.json()).then((d) => { httpsPort = d.https_port; }).catch(() => {});
+
+const detector = 'BarcodeDetector' in window ? new BarcodeDetector({ formats: ['qr_code'] }) : null;
+
+async function readFrame(v) {
+  if (detector) {
+    try {
+      const codes = await detector.detect(v);
+      if (codes[0]) return codes[0].rawValue;
+      return null;
+    } catch { /* fall through to jsQR */ }
+  }
+  // jsQR on the centre square of the frame (where the gold box is), scaled to 480px: fast on any phone.
+  const side = Math.min(v.videoWidth, v.videoHeight) * 0.8;
+  const canvas = $('canvas');
+  canvas.width = canvas.height = 480;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(v, (v.videoWidth - side) / 2, (v.videoHeight - side) / 2, side, side, 0, 0, 480, 480);
+  const img = ctx.getImageData(0, 0, 480, 480);
+  const found = jsQR(img.data, 480, 480, { inversionAttempts: 'dontInvert' });
+  return found && found.data ? found.data : null;
+}
+
+$('scanBtn').onclick = async () => {
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    if (httpsPort && location.protocol === 'http:') return $('secureScrim').classList.remove('hidden');
+    return $('photoInput').click();
+  }
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+    });
+  } catch (e) {
+    return toast(e && e.name === 'NotAllowedError'
+      ? 'Camera is blocked. Allow camera access for this site in your browser, or use Upload QR.'
+      : 'Could not open the camera. Use Upload QR instead.', true);
+  }
+  const v = $('video');
+  v.srcObject = camStream;
+  $('scanHint').textContent = 'Point at a UPI QR code';
+  $('scanner').classList.remove('hidden');
+  await v.play().catch(() => {});
+
+  let busy = false;
+  const tick = async () => {
+    if (!camStream) return;
+    if (!busy && v.videoWidth) {
+      busy = true;
+      const text = await readFrame(v);
+      busy = false;
+      if (!camStream) return;
+      if (text && /^upi:\/\/pay\?/i.test(text.trim())) {
+        if (navigator.vibrate) navigator.vibrate(60);
+        stopCam();
+        return usePayload(text);
+      }
+      if (text) $('scanHint').textContent = 'That is not a UPI payment QR. Try another one.';
+    }
+    setTimeout(() => requestAnimationFrame(tick), 60);
+  };
+  tick();
+};
+function stopCam() {
+  if (camStream) camStream.getTracks().forEach((t) => t.stop());
+  camStream = null;
+  $('video').srcObject = null;
+  $('scanner').classList.add('hidden');
+}
+$('camStop').onclick = stopCam;
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopCam(); }); // release the camera when the app is backgrounded
+
+// "open the secure version" sheet (shown on plain http)
+$('secureGo').onclick = () => { location.href = `https://${location.hostname}:${httpsPort}/`; };
+$('securePhoto').onclick = () => { $('secureScrim').classList.add('hidden'); $('photoInput').click(); };
+$('secureScrim').onclick = (e) => { if (e.target === $('secureScrim')) $('secureScrim').classList.add('hidden'); };
+
+// paste sheet
+$('pasteBtn').onclick = () => $('pasteScrim').classList.remove('hidden');
+$('pasteCancel').onclick = () => $('pasteScrim').classList.add('hidden');
+$('pasteUse').onclick = () => { $('pasteScrim').classList.add('hidden'); usePayload($('payloadText').value); };
+
+// ---------- pay sheet: amount -> locked price -> confirm ----------
+async function usePayload(text) {
+  clearQuote();
+  $('payErr').textContent = '';
+  let upi;
+  try { upi = await api('/upi/parse', { payload: text }); }
+  catch (e) { return toast(e.message, true); }
+  payload = text.trim();
+  $('payeeName').textContent = upi.name || upi.vpa;
+  $('payeeVpa').textContent = upi.vpa;
+  $('inr').value = upi.amount || '';
+  $('payScrim').classList.remove('hidden');
+  if (upi.amount) getQuote(); // QR already has the amount: show the price straight away
+  else $('inr').focus();
+}
+
+function clearQuote() {
+  quote = null;
+  clearInterval(quoteTimer);
+  $('quoteBox').classList.add('hidden');
+  $('confirmBtn').classList.add('hidden');
+  $('quoteBtn').classList.remove('hidden');
+}
+
+function closePay() {
+  clearQuote();
+  $('payScrim').classList.add('hidden');
+}
+
+async function getQuote() {
+  $('payErr').textContent = '';
+  clearQuote();
+  $('quoteBtn').disabled = true;
+  try {
+    const q = await api('/quote', { payload, inr_amount: $('inr').value.trim() });
+    quote = { token: q.quote, expiresAt: Date.now() + q.expires_in * 1000 };
+    $('qUsdt').textContent = q.usdt;
+    $('qRate').textContent = Number(q.rate).toFixed(2);
+    $('confirmBtn').textContent = `Confirm and pay ₹${q.inr}`;
+    $('quoteBox').classList.remove('hidden');
+    $('confirmBtn').classList.remove('hidden');
+    $('quoteBtn').classList.add('hidden');
+    $('inr').blur(); // drop the keyboard so the Confirm button is visible
+    const tick = () => {
+      const left = Math.max(0, Math.round((quote.expiresAt - Date.now()) / 1000));
+      $('qLeft').textContent = left;
+      if (left <= 0) { clearQuote(); $('payErr').textContent = 'Price expired. Tap Get price again.'; }
+    };
+    tick();
+    quoteTimer = setInterval(tick, 1000);
+  } catch (e) { $('payErr').textContent = e.message; }
+  $('quoteBtn').disabled = false;
+}
+
+$('quoteBtn').onclick = getQuote;
+$('inr').oninput = () => { if (quote) clearQuote(); };   // changing the amount needs a new price
+$('inr').onkeydown = (e) => { if (e.key === 'Enter') getQuote(); };
+$('cancelBtn').onclick = closePay;
+$('payScrim').onclick = (e) => { if (e.target === $('payScrim')) closePay(); };
+$('pasteScrim').onclick = (e) => { if (e.target === $('pasteScrim')) $('pasteScrim').classList.add('hidden'); };
+
+$('confirmBtn').onclick = async () => {
+  if (!quote) return;
+  $('confirmBtn').disabled = true;
+  try {
+    const o = await api('/orders', { quote: quote.token });
+    closePay();
+    toast(`Order #${o.id} sent to a merchant`);
+    refresh();
+  } catch (e) { $('payErr').textContent = e.message; }
+  $('confirmBtn').disabled = false;
+};
+
+refresh();
+setInterval(() => { if (getToken() && !document.hidden) refresh(); }, 5000);
+</script>
+</body>
+</html>

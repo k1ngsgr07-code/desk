@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Desk Admin - TEST BUILD</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .stat { background: #f4f5f7; border-radius: 8px; padding: 10px 12px; }
+    .stat .v { font-size: 20px; font-weight: 700; }
+    dialog { border: 0; border-radius: 12px; padding: 20px; width: min(760px, 94vw); max-height: 90vh; }
+    dialog.narrow { width: min(440px, 94vw); }
+    dialog::backdrop { background: rgba(0,0,0,.45); }
+    .form { display: grid; gap: 10px; }
+    .form label { display: grid; gap: 3px; font-size: 13px; color: #556; }
+    .form input, .form textarea { width: 100%; }
+    .head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .head h2 { margin: 0; }
+    h3 { font-size: 15px; margin: 18px 0 8px; }
+    .kv { display: grid; grid-template-columns: 150px 1fr; gap: 4px 10px; font-size: 14px; }
+    .kv div:nth-child(odd) { color: #667; }
+  </style>
+</head>
+<body>
+<div class="banner">TEST BUILD - NO REAL MONEY</div>
+<main class="wide">
+  <h1>Desk admin <span class="muted"><a href="/">back to web app</a></span></h1>
+  <div id="msg" class="err"></div>
+
+  <div id="admin" class="hidden">
+    <div class="card">
+      <h2>Today <span class="muted">(since midnight, India time)</span></h2>
+      <div class="stats">
+        <div class="stat"><div class="muted">Orders paid</div><div class="v" id="tCount">0</div></div>
+        <div class="stat"><div class="muted">INR paid out by merchants</div><div class="v">₹<span id="tInr">0</span></div></div>
+        <div class="stat"><div class="muted">USDT collected</div><div class="v" id="tUsdt">0</div></div>
+        <div class="stat"><div class="muted">Desk margin (spread)</div><div class="v">₹<span id="tMargin">0</span></div></div>
+        <div class="stat"><div class="muted">Owed to all merchants now</div><div class="v">₹<span id="tOwed">0</span></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Rate</h2>
+      <div class="row">
+        <label>Base ₹/USDT <input id="base" size="8"></label>
+        <label>Spread % <input id="spread" size="5"></label>
+        <button id="rateBtn">Save</button>
+        <span>Users see: <b>₹<span id="userRate"></span></b></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head">
+        <h2>Merchants</h2>
+        <button id="addBtn">+ Add merchant</button>
+      </div>
+      <div class="muted" id="tgState"></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>#</th><th>Name</th><th>Telegram</th><th>Orders paid</th><th>Total paid out</th><th>Settled</th><th>Desk owes</th><th></th></tr></thead>
+          <tbody id="merchants"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Orders</h2>
+      <div class="muted">The Approve / Decline / Paid buttons here simulate the merchant (test only), for when Telegram is not connected.</div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>#</th><th>User</th><th>Merchant</th><th>Payee</th><th>INR</th><th>USDT</th><th>Status</th><th>Proof</th><th>Created</th><th></th></tr></thead>
+          <tbody id="orders"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Ledger balances</h2>
+      <div id="check"></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Owner</th><th>Account</th><th>Currency</th><th>Balance</th></tr></thead>
+          <tbody id="balances"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Add / edit merchant -->
+<dialog id="editDlg" class="narrow">
+  <form id="editForm" class="form">
+    <h2 id="editTitle">Add merchant</h2>
+    <label>Name <input id="mName" maxlength="80" required></label>
+    <label>Phone <input id="mPhone" maxlength="20" inputmode="tel" placeholder="optional"></label>
+    <label>Settle to (their UPI id or bank details) <input id="mSettle" maxlength="120" placeholder="optional"></label>
+    <label>Note <textarea id="mNote" rows="2" maxlength="300" placeholder="optional, e.g. profit share terms"></textarea></label>
+    <div id="editErr" class="err"></div>
+    <div class="row">
+      <button type="submit">Save</button>
+      <button type="button" class="alt" data-close>Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Record settlement -->
+<dialog id="settleDlg" class="narrow">
+  <form id="settleForm" class="form">
+    <h2>Record settlement</h2>
+    <div>Merchant: <b id="sName"></b></div>
+    <div>Desk owes: <b>₹<span id="sOwed"></span></b></div>
+    <div class="muted" id="sTo"></div>
+    <div class="muted">Pay the merchant yourself (UPI / bank), then record it here. This only updates the books.</div>
+    <label>Amount paid ₹ <input id="sAmount" inputmode="decimal" required></label>
+    <label>Reference (UTR / note) <input id="sNote" maxlength="100" placeholder="e.g. UTR 4123... evening settlement"></label>
+    <div id="settleErr" class="err"></div>
+    <div class="row">
+      <button type="submit">Record settlement</button>
+      <button type="button" class="alt" data-close>Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Merchant details -->
+<dialog id="detailDlg">
+  <div class="head">
+    <h2 id="dName"></h2>
+    <button class="alt" data-close>Close</button>
+  </div>
+  <div class="kv" id="dInfo"></div>
+  <div class="row" style="margin-top: 10px">
+    <button class="small" id="dSettle">Record settlement</button>
+    <button class="small alt" id="dEdit">Edit details</button>
+    <button class="small alt" id="dRelink">New Telegram link code</button>
+  </div>
+  <h3>Totals</h3>
+  <div class="stats" id="dStats"></div>
+  <h3>Settlements</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>When</th><th>Amount</th><th>Reference</th></tr></thead>
+    <tbody id="dSettlements"></tbody>
+  </table></div>
+  <h3>Orders</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>#</th><th>User</th><th>Payee</th><th>INR</th><th>USDT</th><th>Status</th><th>Proof</th><th>Created</th></tr></thead>
+    <tbody id="dOrders"></tbody>
+  </table></div>
+</dialog>
+
+<script src="/common.js"></script>
+<script>
+let rateLoaded = false;
+let merchants = [];     // from the last overview
+let editingId = null;   // null = adding a new merchant
+let settlingId = null;
+let detailId = null;
+
+const stat = (label, value) => `<div class="stat"><div class="muted">${esc(label)}</div><div class="v">${esc(value)}</div></div>`;
+
+async function load() {
+  let d;
+  try { d = await api('/admin/overview'); }
+  catch (e) {
+    $('admin').classList.add('hidden');
+    $('msg').innerHTML = e.status === 401 || e.message === 'Admins only'
+      ? 'Log in as the admin on the <a href="/">web app</a> first, then reload this page.' : esc(e.message);
+    return;
+  }
+  $('msg').textContent = '';
+  $('admin').classList.remove('hidden');
+  merchants = d.merchants;
+
+  $('tCount').textContent = d.today.paid_count;
+  $('tInr').textContent = d.today.paid_inr;
+  $('tUsdt').textContent = d.today.usdt_collected;
+  $('tMargin').textContent = d.today.margin_inr;
+  $('tOwed').textContent = merchants.reduce((sum, m) => sum + Number(m.owed_inr), 0).toFixed(2);
+
+  if (!rateLoaded) { $('base').value = d.rate.base; $('spread').value = d.rate.spread; rateLoaded = true; }
+  $('userRate').textContent = d.rate.user_rate;
+  $('tgState').textContent = d.telegram
+    ? 'Telegram bot is ON. Each merchant sends their link command to the bot once (see Details).'
+    : 'Telegram bot is OFF (no TELEGRAM_BOT_TOKEN in .env).';
+
+  $('merchants').innerHTML = merchants.map((m) => `<tr>
+    <td>${m.id}</td>
+    <td><b>${esc(m.name)}</b> ${m.active ? '' : '<span class="pill declined">inactive</span>'}
+      <div class="muted">${esc(m.phone || '')}</div></td>
+    <td>${m.linked ? '<span class="pill paid">linked</span>' : `<span class="pill">not linked</span> <code>/link ${esc(m.link_code)}</code>`}</td>
+    <td>${m.paid_count}${m.open_count ? ` <span class="muted">(+${m.open_count} open)</span>` : ''}</td>
+    <td>₹${esc(m.paid_inr)}</td><td>₹${esc(m.settled_inr)}</td><td><b>₹${esc(m.owed_inr)}</b></td>
+    <td>
+      <button class="small" data-detail="${m.id}">Details</button>
+      <button class="small" data-settle="${m.id}" ${Number(m.owed_inr) > 0 ? '' : 'disabled'}>Settle</button>
+      <button class="small alt" data-active="${m.id}" data-to="${m.active ? 0 : 1}">${m.active ? 'Deactivate' : 'Activate'}</button>
+    </td></tr>`).join('') || '<tr><td colspan="8" class="muted">No merchants yet. Add one.</td></tr>';
+
+  $('orders').innerHTML = d.orders.map((o) => `<tr>
+    <td>${o.id}</td><td>${esc(o.email)}</td><td>${esc(o.merchant)}</td>
+    <td>${esc(o.payee_name || '')}<div class="muted">${esc(o.payee_vpa)}</div></td>
+    <td>₹${esc(o.inr_amount)}</td><td>${Number(o.usdt_amount).toFixed(2)}</td>
+    <td>${pill(o.status)}</td><td>${esc((o.proof || '').slice(0, 30))}</td><td>${esc(when(o.created_at))}</td>
+    <td>${o.status === 'pending' ? `<button class="small" data-sim="approve" data-id="${o.id}">Approve</button>
+        <button class="small alt" data-sim="decline" data-id="${o.id}">Decline</button>` : ''}
+        ${o.status === 'approved' ? `<button class="small" data-sim="paid" data-id="${o.id}">Paid</button>
+        <button class="small alt" data-sim="decline" data-id="${o.id}">Cancel</button>` : ''}</td></tr>`).join('');
+
+  $('check').innerHTML = d.ledger_check.map((c) => Number(c.total) === 0
+    ? `<span class="ok">${esc(c.currency)} ledger sums to zero ✓</span>`
+    : `<span class="err">${esc(c.currency)} ledger is OFF by ${esc(c.total)}</span>`).join(' · ') || '<span class="muted">No entries yet.</span>';
+  $('balances').innerHTML = d.balances.map((b) => `<tr>
+    <td>${esc(b.owner_type)}${b.owner_id ? ' #' + b.owner_id : ''}</td><td>${esc(b.label)}</td>
+    <td>${esc(b.currency)}</td><td>${esc(b.balance)}</td></tr>`).join('');
+
+  if ($('detailDlg').open && detailId) loadDetail(detailId);
+}
+
+// ---------- merchant details ----------
+async function loadDetail(id) {
+  const d = await api('/admin/merchants/' + id);
+  const m = d.merchant;
+  detailId = id;
+  $('dName').textContent = `${m.name}${m.active ? '' : ' (inactive)'}`;
+  $('dInfo').innerHTML = [
+    ['Phone', m.phone || '-'],
+    ['Settle to', m.settle_to || '-'],
+    ['Note', m.note || '-'],
+    ['Telegram', m.linked ? 'Linked' : `Not linked. Merchant sends: /link ${m.link_code}`],
+    ['Added', m.created_at ? when(m.created_at) : '-'],
+  ].map(([k, v]) => `<div>${esc(k)}</div><div>${esc(v)}</div>`).join('');
+  $('dStats').innerHTML =
+    stat('Orders paid', m.paid_count) + stat('Open orders', m.open_count) +
+    stat('Total paid out', '₹' + m.paid_inr) + stat('USDT collected', m.usdt_collected) +
+    stat('Desk margin on their orders', '₹' + m.margin_inr) +
+    stat('Settled so far', '₹' + m.settled_inr) + stat('Desk owes now', '₹' + m.owed_inr);
+  $('dSettle').disabled = !(Number(m.owed_inr) > 0);
+  $('dSettlements').innerHTML = d.settlements.map((s) =>
+    `<tr><td>${esc(when(s.created_at))}</td><td>₹${esc(s.inr)}</td><td>${esc(s.note)}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">No settlements yet.</td></tr>';
+  $('dOrders').innerHTML = d.orders.map((o) => `<tr>
+    <td>${o.id}</td><td>${esc(o.email)}</td><td>${esc(o.payee_name || '')}<div class="muted">${esc(o.payee_vpa)}</div></td>
+    <td>₹${esc(o.inr_amount)}</td><td>${Number(o.usdt_amount).toFixed(2)}</td><td>${pill(o.status)}</td>
+    <td>${esc((o.proof || '').slice(0, 30))}</td><td>${esc(when(o.created_at))}</td></tr>`).join('')
+    || '<tr><td colspan="8" class="muted">No orders yet.</td></tr>';
+  if (!$('detailDlg').open) $('detailDlg').showModal();
+}
+
+// ---------- add / edit ----------
+function openEdit(m) {
+  editingId = m ? m.id : null;
+  $('editTitle').textContent = m ? 'Edit merchant' : 'Add merchant';
+  $('mName').value = m ? m.name : '';
+  $('mPhone').value = m ? m.phone || '' : '';
+  $('mSettle').value = m ? m.settle_to || '' : '';
+  $('mNote').value = m ? m.note || '' : '';
+  $('editErr').textContent = '';
+  $('editDlg').showModal();
+}
+$('addBtn').onclick = () => openEdit(null);
+$('dEdit').onclick = () => openEdit(merchants.find((m) => m.id === detailId));
+$('editForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const body = { name: $('mName').value, phone: $('mPhone').value, settle_to: $('mSettle').value, note: $('mNote').value };
+  try {
+    await api(editingId ? '/admin/merchants/' + editingId : '/admin/merchants', body);
+    $('editDlg').close();
+    load();
+  } catch (err) { $('editErr').textContent = err.message; }
+};
+
+// ---------- settlement ----------
+function openSettle(id) {
+  const m = merchants.find((x) => x.id === id);
+  if (!m) return;
+  settlingId = id;
+  $('sName').textContent = m.name;
+  $('sOwed').textContent = m.owed_inr;
+  $('sTo').textContent = m.settle_to ? 'Pay to: ' + m.settle_to : '';
+  $('sAmount').value = m.owed_inr;
+  $('sNote').value = '';
+  $('settleErr').textContent = '';
+  $('settleDlg').showModal();
+}
+$('dSettle').onclick = () => openSettle(detailId);
+$('settleForm').onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    await api('/admin/settle', { merchant_id: settlingId, amount: $('sAmount').value.trim(), note: $('sNote').value.trim() });
+    $('settleDlg').close();
+    load();
+  } catch (err) { $('settleErr').textContent = err.message; }
+};
+
+$('dRelink').onclick = async () => {
+  if (!confirm('Disconnect this merchant\'s Telegram chat and make a new link code?')) return;
+  try { await api(`/admin/merchants/${detailId}/relink`, {}); load(); }
+  catch (err) { alert(err.message); }
+};
+
+// ---------- other buttons ----------
+$('rateBtn').onclick = async () => {
+  try { await api('/admin/rate', { base: $('base').value, spread: $('spread').value }); rateLoaded = false; load(); }
+  catch (e) { alert(e.message); }
+};
+
+document.addEventListener('click', async (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLButtonElement)) return;
+  if ('close' in t.dataset) return t.closest('dialog').close();
+  try {
+    if (t.dataset.sim) await api(`/admin/orders/${t.dataset.id}/simulate`, { action: t.dataset.sim });
+    else if (t.dataset.detail) return loadDetail(Number(t.dataset.detail));
+    else if (t.dataset.settle) return openSettle(Number(t.dataset.settle));
+    else if (t.dataset.active) await api(`/admin/merchants/${t.dataset.active}/active`, { active: t.dataset.to === '1' });
+    else return;
+    load();
+  } catch (err) { alert(err.message); }
+});
+
+load();
+setInterval(() => { if (!document.hidden) load(); }, 5000);
+</script>
+</body>
+</html>
