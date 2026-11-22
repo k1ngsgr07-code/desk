@@ -6,12 +6,12 @@
 
 import { Bot, InlineKeyboard } from 'grammy';
 import { pool } from './db';
-import { BANNER, config } from './config';
+import { config } from './config';
 import { AppError } from './ledger';
 import { Order, approve, decline, markPaid, merchantSummary, setProof } from './orders';
 
 let bot: Bot | null = null;
-const TAG = `[${BANNER}]`;
+const TAG = '[Desk]';
 
 async function merchantByChat(chatId: number) {
   const r = await pool.query('SELECT id, name FROM merchants WHERE telegram_chat_id=$1 AND active', [chatId]);
